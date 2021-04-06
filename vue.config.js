@@ -45,7 +45,7 @@ module.exports = {
     port: 9002,
     https: false,
     hotOnly: false,
-    proxy: proxyConfig.proxy // 设置代理
+    proxy: proxyConfig // 设置代理
     //  before: app => {}s
   }
   // // 第三方插件配置

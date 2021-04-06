@@ -9,10 +9,13 @@
   },
   "dependencies": {
     "ant-design-vue": "^1.7.4",
+    "axios": "^0.21.1",
     "core-js": "^2.6.5",
     "vue": "^2.6.10",
+    "vue-axios": "^3.2.4",
     "vue-router": "^3.0.3",
-    "vuex": "^3.0.1"
+    "vuex": "^3.0.1",
+    "w-vue-emoji": "^1.0.3"
   },
   "devDependencies": {
     "@vue/cli-plugin-babel": "^3.12.0",

@@ -10,6 +10,10 @@ Vue.use(Antd);
 
 Vue.config.productionTip = false
 
+import { getRequest, postRequest } from './api/request'
+Vue.prototype.getRequest = getRequest;
+Vue.prototype.postRequest = postRequest;
+
 new Vue({
   router,
   store,
