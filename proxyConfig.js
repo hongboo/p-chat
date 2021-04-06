@@ -4,6 +4,6 @@ module.exports = {
             "target": 'http://localhost:9001',
             "secure": false,
             "changeOrigin": true,
-        },
+        }
     }
 }
