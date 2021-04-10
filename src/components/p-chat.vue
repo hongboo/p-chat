@@ -9,11 +9,7 @@
         />
         <div class="top" v-else>
           Talking with
-          {{
-            currentDialogUser.nickName
-              ? currentDialogUser.nickName
-              : currentDialogUser.userId
-          }}
+          {{ currentDialogUser.nickName }}
         </div>
         <div class="up">
           <div
@@ -43,14 +39,16 @@
           v-for="(item, idx) in userMap.values()"
           :key="idx"
           @click="selectUser(item)"
+          @dblclick="editNickNameSwitch(item)"
         >
-          <!-- <div
-          :class="(idx + 1) % 2 !== 0 ? 'list-1' : 'list-2'"
-          v-for="(item, idx) in userList"
-          :key="idx"
-          @click="selectUser(item)"
-        > -->
-          {{ item.nickName ? item.nickName : item.userId }}
+          <a-input
+            :id="'_' + item.userId"
+            class="a-input"
+            placeholder="给自己改个昵称"
+            v-show="item.editSwitch"
+            @blur="editNickName(item)"
+          />
+          <span v-show="!item.editSwitch">{{ item.nickName }}</span>
         </div>
       </div>
     </div>
@@ -134,7 +132,6 @@ export default {
       this.initWebSocket();
     },
     websocketonmessage(e) {
-      debugger;
       //数据接收
       const redata = JSON.parse(e.data);
       if (redata.dataType === 1) {
@@ -145,18 +142,10 @@ export default {
         let userMap = new Map([...this.userMap]);
         if (redata.status === 1) {
           userMap.set(redata.user.userId, redata.user);
-          this.$message.success(
-            `${
-              redata.user.nickName ? redata.user.nickName : redata.user.userId
-            } 进入了房间`
-          );
+          this.$message.success(`${redata.user.nickName} 进入了房间`);
         } else if (redata.status === 2) {
           userMap.delete(redata.user.userId);
-          this.$message.warning(
-            `${
-              redata.user.nickName ? redata.user.nickName : redata.user.userId
-            } 离开了房间`
-          );
+          this.$message.warning(`${redata.user.nickName} 离开了房间`);
         }
         this.userMap = userMap;
       } else if (redata.dataType === 2) {
@@ -181,7 +170,6 @@ export default {
     },
     websocketsend(data) {
       //数据发送
-      debugger;
       this.websock.send(data);
       let comments = this.getDialogDataArr(this.currentDialogUser.userId);
       comments.push({
@@ -194,7 +182,6 @@ export default {
     },
     websocketclose(e) {
       //关闭
-      debugger;
       let data = {
         dataType: 1,
         status: 2, // 离线
@@ -206,31 +193,66 @@ export default {
     selectUser(user) {
       this.currentDialogUser = user;
     },
+    editNickNameSwitch(user) {
+      if (user.userId !== this.user.userId) {
+        return;
+      }
+      this.$set(user, "editSwitch", true);
+      debugger;
+      // document.querySelector('#_' + user.userId).click()
+      // let e = document.createEvent("MouseEvents");
+      // e.initEvent("click", true, true);
+      // document.querySelector("#_" + user.userId).dispatchEvent(e);
+    },
+    editNickName(user) {
+      debugger;
+      user.editSwitch = false;
+      let nickNameValue = document.querySelector("#_" + user.userId).value;
+      if (nickNameValue && nickNameValue.trim()) {
+        user.nickName = nickNameValue;
+        let data = {
+          dataType: 1,
+          status: 1, // 在线
+          user: user,
+        };
+        this.websock.send(JSON.stringify(data));
+      }
+    },
     getUser() {
       let user = sessionStorage.getItem("user");
       if (user) {
         this.user = JSON.parse(user);
+        this.userMap = new Map([[this.user.userId, this.user]]);
+        console.log("当前用户ID", this.user.userId);
         this.initWebSocket();
       } else {
         this.postRequest("/user/getUserId").then((resp) => {
           if (resp.data.userId) {
             this.user = {
               userId: resp.data.userId,
-              nickName: "",
+              nickName: resp.data.userId,
             };
+            debugger;
+            // this.userMap = new Map([[this.user.userId, this.user]]);
+            this.userMap = new Map([
+              [this.user.userId, this.user],
+              ...this.userMap,
+            ]);
             sessionStorage.setItem("user", JSON.stringify(this.user));
+            console.log("当前用户ID", this.user.userId);
             this.initWebSocket();
           }
         });
       }
-      console.log("当前用户ID", this.user.userId);
     },
     getUserMap() {
       this.postRequest("/user/getUserMap").then((resp) => {
         if (resp.data.userMap) {
           let userMap = new Map(Object.entries(resp.data.userMap));
-          userMap.delete(this.user.userId);
-          this.userMap = userMap;
+          // userMap.delete(this.user.userId);
+          this.userMap = new Map([...this.userMap, ...userMap]);
+          // this.userMap = userMap;
+          let that = this;
         }
       });
     },
@@ -254,6 +276,16 @@ export default {
   position: relative;
   top: 50px;
   font-size: 16px;
+  // box-shadow: #66a 0px 0px 10px;
+  &:hover {
+    -webkit-transform: translateY(-3px);
+    -ms-transform: translateY(-3px);
+    transform: translateY(-3px);
+    -webkit-box-shadow: 0 0 6px #999;
+    box-shadow: #66a 0px 0px 10px;
+    -webkit-transition: all 0.5s ease-out;
+    transition: all 0.5s ease-out;
+  }
   .left {
     border-right: 1px solid;
     width: 75%;
@@ -321,9 +353,15 @@ export default {
       margin: 10px;
     }
     .list-1 {
+      input.a-input.ant-input {
+        background: #eaf5ec;
+      }
       background: #eaf5ec;
     }
     .list-2 {
+      input.a-input.ant-input {
+        background: #f7efd2;
+      }
       background: #f7efd2;
     }
     .list-1,
