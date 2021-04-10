@@ -5,13 +5,20 @@
         <a-alert
           message="please select talk user"
           banner
-          v-if="!currentDialogUser"
+          v-if="!currentDialogUser.userId"
         />
-        <div class="top" v-else>Talking with {{ currentDialogUser }}</div>
+        <div class="top" v-else>
+          Talking with
+          {{
+            currentDialogUser.nickName
+              ? currentDialogUser.nickName
+              : currentDialogUser.userId
+          }}
+        </div>
         <div class="up">
           <div
-            :class="userId === item.userId ? 'owner' : 'other'"
-            v-for="(item, idx) in comments"
+            :class="user.userId === item.userId ? 'owner' : 'other'"
+            v-for="(item, idx) in currentDialogDataArr"
             :key="idx"
           >
             <span>{{ item.dateTime }}</span
@@ -33,46 +40,55 @@
         <div class="">Talk List</div>
         <div
           :class="(idx + 1) % 2 !== 0 ? 'list-1' : 'list-2'"
-          v-for="(item, idx) in userList"
-          :key="item"
+          v-for="(item, idx) in userMap.values()"
+          :key="idx"
           @click="selectUser(item)"
         >
-          {{ item }}
+          <!-- <div
+          :class="(idx + 1) % 2 !== 0 ? 'list-1' : 'list-2'"
+          v-for="(item, idx) in userList"
+          :key="idx"
+          @click="selectUser(item)"
+        > -->
+          {{ item.nickName ? item.nickName : item.userId }}
         </div>
       </div>
     </div>
   </div>
 </template>
 <script>
-// import {
-//   smileEmoji,
-//   CEmoji,
-//   DisplayInfoWithEmoji,
-//   EmojiItem,
-//   convertEmoji2Str,
-//   convertStr2Emoji,
-// } from "w-vue-emoji";
 import dateUitls from "@/util/utils.js";
 export default {
   name: "PChat",
-  components: {
-    // CEmoji,
-    // DisplayInfoWithEmoji,
-    // EmojiItem,
-  },
+  components: {},
   data() {
     return {
-      comments: [],
+      dialogMap: new Map(),
       talkContent: "",
       websock: null,
-      userId: null,
-      userList: [],
-      currentDialogUser: null,
+      user: {
+        // 自己
+        userId: "",
+        nickName: "",
+      },
+      // userId: null, // 自己的ID
+      userMap: new Map(), // 用户ID与用户的对应关系
+      // userList: [], // 用户列表
+      currentDialogUser: {}, // 当前对话用户    // 改到这里了。。。。。
+      currentDialogDataArr: null, // 当前对话数据
     };
   },
+  watch: {
+    currentDialogUser() {
+      this.currentDialogDataArr = this.dialogMap.get(
+        this.currentDialogUser.userId
+      );
+    },
+  },
+  computed: {},
   methods: {
     handleSubmit() {
-      if (!this.currentDialogUser) {
+      if (!this.currentDialogUser.userId) {
         return;
       }
       if (!this.talkContent.trim()) {
@@ -81,8 +97,9 @@ export default {
 
       let talkContent = this.talkContent;
       let talkData = {
-        userId: this.userId, // 发送者
-        currentDialogUser: this.currentDialogUser, // 接收者
+        dataType: 2,
+        userId: this.user.userId, // 发送者
+        currentDialogUserId: this.currentDialogUser.userId, // 接收者
         talkContent: talkContent,
       };
 
@@ -94,7 +111,9 @@ export default {
     ////////
     initWebSocket() {
       //初始化weosocket
-      const wsuri = "ws://127.0.0.1:9001/websocket/" + this.userId;
+      const wsuri = "ws://127.0.0.1:8081/websocket/" + this.user.userId;
+      // const wsuri = "ws://wwww.alemonice.com:8081/websocket/" + this.user.userId;
+      // const wsuri = "ws://47.106.120.208:8081/websocket/" + this.user.userId;
       this.websock = new WebSocket(wsuri);
       this.websock.onmessage = this.websocketonmessage;
       this.websock.onopen = this.websocketonopen;
@@ -103,75 +122,126 @@ export default {
     },
     websocketonopen() {
       //连接建立之后执行send方法发送数据
+      let data = {
+        dataType: 1,
+        status: 1, // 在线
+        user: this.user,
+      };
+      this.websock.send(JSON.stringify(data));
     },
     websocketonerror() {
       //连接建立失败重连
       this.initWebSocket();
     },
     websocketonmessage(e) {
+      debugger;
       //数据接收
       const redata = JSON.parse(e.data);
-      this.currentDialogUser = redata.sendId;
-      this.comments.push({
-        userId: redata.sendId,
-        talkContent: redata.talkContent,
-        dateTime: redata.dateTime,
-      });
+      if (redata.dataType === 1) {
+        // 用户信息推送
+        if (redata.user.userId === this.user.userId) {
+          return;
+        }
+        let userMap = new Map([...this.userMap]);
+        if (redata.status === 1) {
+          userMap.set(redata.user.userId, redata.user);
+          this.$message.success(
+            `${
+              redata.user.nickName ? redata.user.nickName : redata.user.userId
+            } 进入了房间`
+          );
+        } else if (redata.status === 2) {
+          userMap.delete(redata.user.userId);
+          this.$message.warning(
+            `${
+              redata.user.nickName ? redata.user.nickName : redata.user.userId
+            } 离开了房间`
+          );
+        }
+        this.userMap = userMap;
+      } else if (redata.dataType === 2) {
+        // 文本信息推送
+        this.currentDialogUser = this.userMap.get(redata.sendId); ///////////
+        let comments = this.getDialogDataArr(this.currentDialogUser.userId);
+        comments.push({
+          userId: redata.sendId,
+          talkContent: redata.talkContent,
+          dateTime: redata.dateTime,
+        });
+        this.currentDialogDataArr = comments;
+      }
+    },
+    getDialogDataArr(currentDialogUserId) {
+      let comments = this.dialogMap.get(currentDialogUserId);
+      if (!comments) {
+        comments = [];
+        this.dialogMap.set(currentDialogUserId, comments);
+      }
+      return comments;
     },
     websocketsend(data) {
       //数据发送
-      this.comments.push({
-        userId: this.userId,
+      debugger;
+      this.websock.send(data);
+      let comments = this.getDialogDataArr(this.currentDialogUser.userId);
+      comments.push({
+        userId: this.user.userId,
         talkContent: this.talkContent,
         dateTime: dateUitls.simpleDateFormat(new Date(), "yyyy-MM-dd HH:mm:ss"),
       });
-      this.websock.send(data);
+      this.currentDialogDataArr = comments;
       this.talkContent = "";
     },
     websocketclose(e) {
       //关闭
+      debugger;
+      let data = {
+        dataType: 1,
+        status: 2, // 离线
+        user: this.user,
+      };
+      this.websock.send(JSON.stringify(data));
       console.log("断开连接", e);
     },
     selectUser(user) {
       this.currentDialogUser = user;
     },
-    getUserId() {
-      this.userId = sessionStorage.getItem("userId");
-      console.log(this.userId);
-      if (!this.userId) {
-        this.postRequest("/user/getUserId", { userId: this.userId }).then(
-          (resp) => {
-            if (resp.data.userId) {
-              this.userId = resp.data.userId;
-              sessionStorage.setItem("userId", this.userId);
-              this.initWebSocket();
-            }
-          }
-        );
-      } else {
+    getUser() {
+      let user = sessionStorage.getItem("user");
+      if (user) {
+        this.user = JSON.parse(user);
         this.initWebSocket();
-      }
-    },
-    getUserList() {
-      this.postRequest("/user/getUserList").then((resp) => {
-        if (resp.data.userList) {
-          let userList = [];
-          for (let userId of resp.data.userList) {
-            if (userId !== this.userId) {
-              userList.push(userId);
-            }
+      } else {
+        this.postRequest("/user/getUserId").then((resp) => {
+          if (resp.data.userId) {
+            this.user = {
+              userId: resp.data.userId,
+              nickName: "",
+            };
+            sessionStorage.setItem("user", JSON.stringify(this.user));
+            this.initWebSocket();
           }
-          this.userList = userList;
+        });
+      }
+      console.log("当前用户ID", this.user.userId);
+    },
+    getUserMap() {
+      this.postRequest("/user/getUserMap").then((resp) => {
+        if (resp.data.userMap) {
+          let userMap = new Map(Object.entries(resp.data.userMap));
+          userMap.delete(this.user.userId);
+          this.userMap = userMap;
         }
       });
     },
   },
   created() {
-    this.getUserId();
-    this.getUserList();
+    this.getUser();
+    this.getUserMap();
   },
+  mounted() {},
   destroyed() {
-    // this.websock.close(); //离开路由之后断开websocket连接
+    this.websock.close(); //离开路由之后断开websocket连接
   },
 };
 </script>
@@ -264,6 +334,4 @@ export default {
     }
   }
 }
-</style> scoped>
-
 </style>
