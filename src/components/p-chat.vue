@@ -66,9 +66,7 @@ export default {
         userId: "",
         nickName: "",
       },
-      // userId: null, // 自己的ID
       userMap: new Map(), // 用户ID与用户的对应关系
-      // userList: [], // 用户列表
       currentDialogUser: {}, // 当前对话用户    // 改到这里了。。。。。
       currentDialogDataArr: null, // 当前对话数据
     };
@@ -241,9 +239,7 @@ export default {
       this.postRequest("/user/getUserMap").then((resp) => {
         if (resp.data.userMap) {
           let userMap = new Map(Object.entries(resp.data.userMap));
-          // userMap.delete(this.user.userId);
           this.userMap = new Map([...this.userMap, ...userMap]);
-          // this.userMap = userMap;
           let that = this;
         }
       });
