@@ -22,11 +22,7 @@
           </div>
         </div>
         <div class="middle">
-          <textarea
-            v-model="talkContent"
-            autofocus
-            @keydown.enter="handleSubmit"
-          />
+          <textarea v-model="talkContent" @keydown.enter="handleSubmit" />
         </div>
         <div class="down">
           <button @click="handleSubmit">send</button>
@@ -47,6 +43,7 @@
             placeholder="给自己改个昵称"
             v-show="item.editSwitch"
             @blur="editNickName(item)"
+            @keydown.enter="editNickName(item)"
           />
           <span v-show="!item.editSwitch">{{ item.nickName }}</span>
         </div>
@@ -198,14 +195,11 @@ export default {
         return;
       }
       this.$set(user, "editSwitch", true);
-      debugger;
-      // document.querySelector('#_' + user.userId).click()
-      // let e = document.createEvent("MouseEvents");
-      // e.initEvent("click", true, true);
-      // document.querySelector("#_" + user.userId).dispatchEvent(e);
+      this.$nextTick(() => {
+        document.querySelector('#_' + user.userId).focus()
+      })
     },
     editNickName(user) {
-      debugger;
       user.editSwitch = false;
       let nickNameValue = document.querySelector("#_" + user.userId).value;
       if (nickNameValue && nickNameValue.trim()) {
@@ -232,8 +226,6 @@ export default {
               userId: resp.data.userId,
               nickName: resp.data.userId,
             };
-            debugger;
-            // this.userMap = new Map([[this.user.userId, this.user]]);
             this.userMap = new Map([
               [this.user.userId, this.user],
               ...this.userMap,
